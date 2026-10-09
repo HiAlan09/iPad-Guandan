@@ -1,0 +1,2124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Guandan Neo">
+    
+    <title>掼蛋 (Guandan Neo) - iPad Pro 12.9" 赛博极简巡回赛版</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        html, body {
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #030712;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Helvetica Neue", Roboto, sans-serif;
+            font-feature-settings: "tnum";
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #root {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .safe-top-padding {
+            padding-top: max(env(safe-area-inset-top), 10px);
+        }
+        .safe-bottom-padding {
+            padding-bottom: max(env(safe-area-inset-bottom), 10px);
+        }
+
+        /* 苹果极简钛晶微网格赛博底纹 */
+        .cyber-titanium-grid {
+            background-color: #030712;
+            background-image: 
+                radial-gradient(ellipse at 50% 30%, rgba(14, 165, 233, 0.12) 0%, transparent 70%),
+                radial-gradient(ellipse at 85% 85%, rgba(244, 63, 94, 0.08) 0%, transparent 60%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+        }
+
+        /* 实体高对比科技微晶卡牌 */
+        .cyber-card {
+            background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 6px 18px -2px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+            transition: transform 0.16s cubic-bezier(0.2, 0, 0.1, 1), box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+        .cyber-card:active {
+            transform: scale(0.97);
+        }
+        /* 选中牌升起：预留充裕空间，不被裁切 */
+        .cyber-card-selected {
+            transform: translateY(-24px) scale(1.05) !important;
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 24px rgba(56, 189, 248, 0.85), 0 16px 30px rgba(0, 0, 0, 0.9) !important;
+            z-index: 45 !important;
+        }
+
+        /* 全息立体卡牌背面 */
+        .card-back-holo {
+            background: linear-gradient(135deg, #15213b 0%, #0a1120 100%);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), inset 0 0 10px rgba(14, 165, 233, 0.2);
+        }
+
+        /* 逢人配（红桃级牌）极光呼吸光效 */
+        .wildcard-glow {
+            border-color: #f43f5e !important;
+            animation: wildPulse 2.2s infinite ease-in-out;
+        }
+        @keyframes wildPulse {
+            0%, 100% { box-shadow: 0 0 12px rgba(244, 63, 94, 0.5), inset 0 0 8px rgba(244, 63, 94, 0.25); }
+            50% { box-shadow: 0 0 26px rgba(244, 63, 94, 0.95), inset 0 0 14px rgba(244, 63, 94, 0.5); }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.92); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-7px); }
+        }
+        .animate-float {
+            animation: floatSlow 5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="cyber-titanium-grid text-slate-100 select-none">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        class CyberAudioEngine {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            playTap() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(340, this.ctx.currentTime + 0.04);
+                    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.04);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.04);
+                } catch(e) {}
+            }
+            playPlayCards() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(260, now);
+                    osc.frequency.linearRampToValueAtTime(650, now + 0.07);
+                    gain.gain.setValueAtTime(0.22, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.11);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(now + 0.11);
+                } catch(e) {}
+            }
+            playBomb() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.exponentialRampToValueAtTime(28, now + 0.45);
+                    gain.gain.setValueAtTime(0.48, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(now + 0.5);
+                } catch(e) {}
+            }
+            playPass() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(210, this.ctx.currentTime + 0.06);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.06);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.06);
+                } catch(e) {}
+            }
+            playFanfare() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.35);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.35);
+                    });
+                } catch(e) {}
+            }
+        }
+        const audio = new CyberAudioEngine();
+
+        // 四花色高辨识度独立配色
+        const SUIT_THEMES = {
+            spades: {
+                name: '黑桃',
+                symbol: '♠',
+                colorClass: 'text-sky-400',
+                hex: '#38bdf8'
+            },
+            hearts: {
+                name: '红桃',
+                symbol: '♥',
+                colorClass: 'text-rose-500',
+                hex: '#f43f5e'
+            },
+            clubs: {
+                name: '梅花',
+                symbol: '♣',
+                colorClass: 'text-emerald-400',
+                hex: '#34d399'
+            },
+            diamonds: {
+                name: '方块',
+                symbol: '♦',
+                colorClass: 'text-amber-400',
+                hex: '#fbbf24'
+            },
+            joker_small: {
+                name: '小王',
+                symbol: 'SJ',
+                colorClass: 'text-slate-200',
+                hex: '#e2e8f0'
+            },
+            joker_big: {
+                name: '大王',
+                symbol: 'BJ',
+                colorClass: 'text-purple-400',
+                hex: '#c084fc'
+            }
+        };
+
+        const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+        const BOT_CANDIDATES = [
+            { name: '博戈局长', title: '警局铁腕', avatar: '🐃' },
+            { name: '树懒闪电', title: '奇谋稳健', avatar: '🦥' },
+            { name: '豹警官', title: '甜甜圈杀手', avatar: '🐆' },
+            { name: '大先生', title: '极地教父', avatar: '🐭' },
+            { name: '芬尼克', title: '暴躁耳狐', avatar: '🐺' },
+            { name: '羊副市长', title: '笑面深沉', avatar: '🐑' },
+            { name: '杜克公爵', title: '盗版录影带商', avatar: '🦝' }
+        ];
+
+        // 彻底覆盖牌桌四周全部空白空槽（完全覆盖用户红框标记的全部外围与角落区域）
+        const SCATTER_TABLE_SLOTS = [
+            // 顶部横向槽位 (Top Area)
+            { x: 25, y: 16, rot: -16 },
+            { x: 37, y: 14, rot: 12 },
+            { x: 50, y: 13, rot: -6 },
+            { x: 63, y: 15, rot: 18 },
+            { x: 75, y: 16, rot: -14 },
+            // 左上与左侧区域 (Left & Upper-Left Area)
+            { x: 12, y: 22, rot: 22 },
+            { x: 18, y: 34, rot: 8 },
+            { x: 27, y: 28, rot: -15 },
+            { x: 11, y: 48, rot: 16 },
+            { x: 19, y: 58, rot: -12 },
+            { x: 28, y: 44, rot: 10 },
+            // 右上与右侧广阔回旋槽位 (Right & Upper-Right Area)
+            { x: 88, y: 22, rot: -20 },
+            { x: 81, y: 34, rot: 16 },
+            { x: 73, y: 28, rot: -9 },
+            { x: 89, y: 48, rot: -18 },
+            { x: 81, y: 58, rot: 12 },
+            { x: 74, y: 44, rot: -14 },
+            // 底部左侧与下侧槽位 (Bottom-Left & Bottom Area)
+            { x: 14, y: 68, rot: -18 },
+            { x: 24, y: 72, rot: 14 },
+            { x: 18, y: 84, rot: 9 },
+            { x: 32, y: 86, rot: -11 },
+            { x: 38, y: 74, rot: -8 },
+            { x: 50, y: 75, rot: 15 },
+            { x: 46, y: 87, rot: -7 },
+            // 底部右侧槽位 (Bottom-Right Area)
+            { x: 62, y: 74, rot: 20 },
+            { x: 76, y: 72, rot: -14 },
+            { x: 86, y: 68, rot: 16 },
+            { x: 72, y: 86, rot: -19 },
+            { x: 84, y: 84, rot: 11 },
+            { x: 58, y: 88, rot: 13 }
+        ];
+
+        const generateGuandanDeck = () => {
+            const deck = [];
+            let cardId = 0;
+            for (let deckIndex = 1; deckIndex <= 2; deckIndex++) {
+                ['spades', 'hearts', 'clubs', 'diamonds'].forEach(suit => {
+                    RANKS.forEach((rank, rIdx) => {
+                        deck.push({
+                            id: `c_${cardId++}`,
+                            suit,
+                            rank,
+                            value: rIdx + 2,
+                            isJoker: false
+                        });
+                    });
+                });
+                deck.push({
+                    id: `c_${cardId++}`,
+                    suit: 'joker_small',
+                    rank: 'SJ',
+                    value: 16,
+                    isJoker: true,
+                    jokerType: 'small'
+                });
+                deck.push({
+                    id: `c_${cardId++}`,
+                    suit: 'joker_big',
+                    rank: 'BJ',
+                    value: 17,
+                    isJoker: true,
+                    jokerType: 'big'
+                });
+            }
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        };
+
+        const isWildCard = (card, levelRank) => {
+            return card.suit === 'hearts' && card.rank === levelRank;
+        };
+
+        const getCardPower = (card, levelRank) => {
+            if (card.isJoker) {
+                return card.jokerType === 'big' ? 100 : 90;
+            }
+            if (isWildCard(card, levelRank)) {
+                return 80;
+            }
+            if (card.rank === levelRank) {
+                return 75;
+            }
+            if (card.rank === 'A') return 14;
+            if (card.rank === 'K') return 13;
+            if (card.rank === 'Q') return 12;
+            if (card.rank === 'J') return 11;
+            if (card.rank === '10') return 10;
+            return parseInt(card.rank, 10);
+        };
+
+        const PATTERN_TYPES = {
+            SINGLE: 'SINGLE',
+            PAIR: 'PAIR',
+            TRIPLET: 'TRIPLET',
+            FULL_HOUSE: 'FULL_HOUSE',
+            STRAIGHT: 'STRAIGHT',
+            STEEL_PLATE: 'STEEL_PLATE',
+            CONSECUTIVE_PAIRS: 'CONSECUTIVE_PAIRS',
+            BOMB_4: 'BOMB_4',
+            BOMB_5: 'BOMB_5',
+            STRAIGHT_FLUSH: 'STRAIGHT_FLUSH',
+            BOMB_6: 'BOMB_6',
+            BOMB_7: 'BOMB_7',
+            BOMB_8: 'BOMB_8',
+            FOUR_KINGS: 'FOUR_KINGS'
+        };
+
+        const BOMB_TIERS = {
+            BOMB_4: 1,
+            BOMB_5: 2,
+            STRAIGHT_FLUSH: 3,
+            BOMB_6: 4,
+            BOMB_7: 5,
+            BOMB_8: 6,
+            FOUR_KINGS: 7
+        };
+
+        const analyzePattern = (cards, levelRank) => {
+            if (!cards || cards.length === 0) return null;
+            const count = cards.length;
+
+            if (count === 4 && cards.filter(c => c.isJoker).length === 4) {
+                return { type: PATTERN_TYPES.FOUR_KINGS, power: 1000, name: '四大天王 (天王炸)', count: 4 };
+            }
+
+            const wilds = cards.filter(c => isWildCard(c, levelRank));
+            const naturals = cards.filter(c => !isWildCard(c, levelRank));
+            const wildCount = wilds.length;
+
+            if (count === 1) {
+                return {
+                    type: PATTERN_TYPES.SINGLE,
+                    power: getCardPower(cards[0], levelRank),
+                    name: `单张 ${cards[0].rank}`,
+                    count: 1
+                };
+            }
+
+            if (count === 2) {
+                if (wildCount === 2 || wildCount === 1) {
+                    const base = naturals[0] || wilds[0];
+                    return { type: PATTERN_TYPES.PAIR, power: getCardPower(base, levelRank), name: `对子 ${base.rank}`, count: 2 };
+                }
+                if (naturals[0].rank === naturals[1].rank) {
+                    return { type: PATTERN_TYPES.PAIR, power: getCardPower(naturals[0], levelRank), name: `对子 ${naturals[0].rank}`, count: 2 };
+                }
+                return null;
+            }
+
+            if (count === 3) {
+                const targetRank = naturals.length > 0 ? naturals[0].rank : levelRank;
+                const matches = naturals.filter(c => c.rank === targetRank).length + wildCount;
+                if (matches === 3) {
+                    return { type: PATTERN_TYPES.TRIPLET, power: getCardPower(naturals[0] || wilds[0], levelRank), name: `三张 ${targetRank}`, count: 3 };
+                }
+                return null;
+            }
+
+            if (count >= 4 && count <= 8) {
+                const nonJokers = naturals.filter(c => !c.isJoker);
+                if (nonJokers.length === naturals.length) {
+                    const rankCounts = {};
+                    nonJokers.forEach(c => rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1);
+                    const distinctRanks = Object.keys(rankCounts);
+                    if (distinctRanks.length <= 1) {
+                        const targetR = distinctRanks[0] || levelRank;
+                        const bombType = `BOMB_${count}`;
+                        return {
+                            type: PATTERN_TYPES[bombType],
+                            power: getCardPower({ rank: targetR, suit: 'spades' }, levelRank),
+                            name: `${count}炸 ${targetR}`,
+                            count
+                        };
+                    }
+                }
+            }
+
+            if (count === 5) {
+                const straightResult = checkStraightOrFlush(cards, levelRank);
+                if (straightResult) return straightResult;
+
+                const fullHouse = checkFullHouse(cards, levelRank);
+                if (fullHouse) return fullHouse;
+            }
+
+            if (count === 6) {
+                const plate = checkSteelPlate(cards, levelRank);
+                if (plate) return plate;
+
+                const consecutivePairs = checkConsecutivePairs(cards, levelRank);
+                if (consecutivePairs) return consecutivePairs;
+            }
+
+            return null;
+        };
+
+        const checkStraightOrFlush = (cards, levelRank) => {
+            const naturals = cards.filter(c => !isWildCard(c, levelRank));
+            if (naturals.some(c => c.isJoker)) return null;
+
+            const wilds = cards.filter(c => isWildCard(c, levelRank));
+            const wildCount = wilds.length;
+
+            const rankToNum = r => {
+                if (r === 'A') return 14;
+                if (r === 'K') return 13;
+                if (r === 'Q') return 12;
+                if (r === 'J') return 11;
+                return parseInt(r, 10);
+            };
+
+            const naturalNums = [...new Set(naturals.map(c => rankToNum(c.rank)))].sort((a,b)=>a-b);
+            if (naturalNums.length + wildCount < 5) return null;
+
+            let bestSpan = null;
+            for (let start = 1; start <= 10; start++) {
+                const targetSpan = [start, start+1, start+2, start+3, start+4];
+                let neededWilds = 0;
+                for (let num of targetSpan) {
+                    const actualNum = num === 1 ? 14 : num;
+                    if (!naturalNums.includes(actualNum)) {
+                        neededWilds++;
+                    }
+                }
+                if (neededWilds <= wildCount) {
+                    bestSpan = start + 4;
+                }
+            }
+
+            if (bestSpan !== null) {
+                const suits = naturals.map(c => c.suit);
+                const isFlush = suits.length > 0 && suits.every(s => s === suits[0]);
+
+                if (isFlush) {
+                    return {
+                        type: PATTERN_TYPES.STRAIGHT_FLUSH,
+                        power: bestSpan,
+                        name: `同花顺 (${SUIT_THEMES[suits[0]].name}) 至 ${bestSpan === 14 ? 'A' : bestSpan}`,
+                        count: 5
+                    };
+                }
+
+                return {
+                    type: PATTERN_TYPES.STRAIGHT,
+                    power: bestSpan,
+                    name: `顺子 (至 ${bestSpan === 14 ? 'A' : bestSpan})`,
+                    count: 5
+                };
+            }
+            return null;
+        };
+
+        const checkFullHouse = (cards, levelRank) => {
+            const wilds = cards.filter(c => isWildCard(c, levelRank));
+            const naturals = cards.filter(c => !isWildCard(c, levelRank));
+            const wildCount = wilds.length;
+
+            const counts = {};
+            naturals.forEach(c => counts[c.rank] = (counts[c.rank] || 0) + 1);
+            const ranks = Object.keys(counts);
+
+            if (ranks.length > 2) return null;
+
+            if (ranks.length <= 1) {
+                const r = ranks[0] || levelRank;
+                return { type: PATTERN_TYPES.FULL_HOUSE, power: getCardPower({ rank: r, suit: 'spades' }, levelRank), name: `三带二 (${r})`, count: 5 };
+            }
+
+            const [r1, r2] = ranks;
+            const c1 = counts[r1];
+            const c2 = counts[r2];
+
+            const needA = Math.max(0, 3 - c1) + Math.max(0, 2 - c2);
+            const needB = Math.max(0, 3 - c2) + Math.max(0, 2 - c1);
+
+            if (needA <= wildCount || needB <= wildCount) {
+                const pow1 = getCardPower({ rank: r1, suit: 'spades' }, levelRank);
+                const pow2 = getCardPower({ rank: r2, suit: 'spades' }, levelRank);
+                const bestTriadRank = (needA <= wildCount && needB <= wildCount)
+                    ? (pow1 > pow2 ? r1 : r2)
+                    : (needA <= wildCount ? r1 : r2);
+
+                return {
+                    type: PATTERN_TYPES.FULL_HOUSE,
+                    power: getCardPower({ rank: bestTriadRank, suit: 'spades' }, levelRank),
+                    name: `三带二 (${bestTriadRank})`,
+                    count: 5
+                };
+            }
+            return null;
+        };
+
+        const checkSteelPlate = (cards, levelRank) => {
+            const naturals = cards.filter(c => !isWildCard(c, levelRank));
+            if (naturals.some(c => c.isJoker)) return null;
+
+            const rankToNum = r => (r === 'A' ? 14 : (r === 'K' ? 13 : (r === 'Q' ? 12 : (r === 'J' ? 11 : parseInt(r, 10)))));
+            const wildCount = cards.filter(c => isWildCard(c, levelRank)).length;
+
+            for (let start = 2; start <= 13; start++) {
+                const n1 = start;
+                const n2 = start + 1;
+                const c1 = naturals.filter(c => rankToNum(c.rank) === n1).length;
+                const c2 = naturals.filter(c => rankToNum(c.rank) === n2).length;
+                const need = Math.max(0, 3 - c1) + Math.max(0, 3 - c2);
+
+                if (c1 <= 3 && c2 <= 3 && need <= wildCount && (c1 + c2 + wildCount === 6)) {
+                    return {
+                        type: PATTERN_TYPES.STEEL_PLATE,
+                        power: n2,
+                        name: `钢板 (${n1}·${n2})`,
+                        count: 6
+                    };
+                }
+            }
+            return null;
+        };
+
+        const checkConsecutivePairs = (cards, levelRank) => {
+            const naturals = cards.filter(c => !isWildCard(c, levelRank));
+            if (naturals.some(c => c.isJoker)) return null;
+
+            const rankToNum = r => (r === 'A' ? 14 : (r === 'K' ? 13 : (r === 'Q' ? 12 : (r === 'J' ? 11 : parseInt(r, 10)))));
+            const wildCount = cards.filter(c => isWildCard(c, levelRank)).length;
+
+            for (let start = 2; start <= 12; start++) {
+                const targetNums = [start, start + 1, start + 2];
+                let needed = 0;
+                let overflow = false;
+
+                for (let num of targetNums) {
+                    const have = naturals.filter(c => rankToNum(c.rank) === num).length;
+                    if (have > 2) overflow = true;
+                    needed += Math.max(0, 2 - have);
+                }
+
+                if (!overflow && needed <= wildCount) {
+                    return {
+                        type: PATTERN_TYPES.CONSECUTIVE_PAIRS,
+                        power: start + 2,
+                        name: `三连对 (${start}至${start + 2})`,
+                        count: 6
+                    };
+                }
+            }
+            return null;
+        };
+
+        const canBeatTable = (candidate, table, levelRank) => {
+            if (!candidate) return false;
+            if (!table) return true;
+
+            const candBombTier = BOMB_TIERS[candidate.type];
+            const tableBombTier = BOMB_TIERS[table.type];
+
+            if (tableBombTier) {
+                if (!candBombTier) return false;
+                if (candBombTier > tableBombTier) return true;
+                if (candBombTier < tableBombTier) return false;
+                return candidate.power > table.power;
+            }
+
+            if (candBombTier) {
+                return true;
+            }
+
+            if (candidate.type !== table.type || candidate.count !== table.count) {
+                return false;
+            }
+
+            return candidate.power > table.power;
+        };
+
+        const decomposeHandCards = (handCards, levelRank) => {
+            if (!handCards || handCards.length === 0) return { bombs: [], straights: [], fullHouses: [], pairs: [], singles: [] };
+
+            const cards = [...handCards];
+            const bombs = [];
+            const straights = [];
+            const fullHouses = [];
+            const pairs = [];
+            const singles = [];
+
+            const jokers = cards.filter(c => c.isJoker);
+            if (jokers.length === 4) {
+                bombs.push({ name: '四大天王 (天王炸)', cards: [...jokers], power: 1000 });
+            }
+
+            const rankMap = {};
+            cards.filter(c => !c.isJoker).forEach(c => {
+                if (!rankMap[c.rank]) rankMap[c.rank] = [];
+                rankMap[c.rank].push(c);
+            });
+
+            for (const r in rankMap) {
+                if (rankMap[r].length >= 4) {
+                    bombs.push({
+                        name: `${rankMap[r].length}炸 ${r}`,
+                        cards: [...rankMap[r]],
+                        power: getCardPower(rankMap[r][0], levelRank)
+                    });
+                }
+            }
+
+            const nonJokers = cards.filter(c => !c.isJoker);
+            const rankToNum = r => (r === 'A' ? 14 : (r === 'K' ? 13 : (r === 'Q' ? 12 : (r === 'J' ? 11 : parseInt(r, 10)))));
+            const uniqueNums = [...new Set(nonJokers.map(c => rankToNum(c.rank)))].sort((a,b)=>a-b);
+
+            for (let i = 0; i <= uniqueNums.length - 5; i++) {
+                const sub = uniqueNums.slice(i, i + 5);
+                if (sub[4] - sub[0] === 4 && new Set(sub).size === 5) {
+                    const straightCards = [];
+                    sub.forEach(val => {
+                        const found = nonJokers.find(c => rankToNum(c.rank) === val && !straightCards.some(sc => sc.id === c.id));
+                        if (found) straightCards.push(found);
+                    });
+                    if (straightCards.length === 5) {
+                        straights.push({
+                            name: `顺子 (${sub[0]} 至 ${sub[4] === 14 ? 'A' : sub[4]})`,
+                            cards: straightCards,
+                            power: sub[4]
+                        });
+                    }
+                }
+            }
+
+            for (const r in rankMap) {
+                if (rankMap[r].length === 3) {
+                    const otherPairRank = Object.keys(rankMap).find(k => k !== r && rankMap[k].length === 2);
+                    if (otherPairRank) {
+                        fullHouses.push({
+                            name: `三带二 (${r} 带 ${otherPairRank})`,
+                            cards: [...rankMap[r], ...rankMap[otherPairRank]],
+                            power: getCardPower(rankMap[r][0], levelRank)
+                        });
+                    }
+                } else if (rankMap[r].length === 2) {
+                    pairs.push({
+                        name: `对子 ${r}`,
+                        cards: [...rankMap[r]],
+                        power: getCardPower(rankMap[r][0], levelRank)
+                    });
+                } else if (rankMap[r].length === 1) {
+                    singles.push({
+                        name: `单张 ${r}`,
+                        cards: [rankMap[r][0]],
+                        power: getCardPower(rankMap[r][0], levelRank)
+                    });
+                }
+            }
+
+            return { bombs, straights, fullHouses, pairs, singles };
+        };
+
+        // 全牌型智能搜寻器：支持顺子、三带二、钢板、木板、三张、对子、单张全面决策
+        const findSmartAdvice = (handCards, tableTurn, levelRank, isTeammateLeading) => {
+            if (!handCards || handCards.length === 0) return null;
+
+            const decomposed = decomposeHandCards(handCards, levelRank);
+
+            // 1. 自由领牌模式 (桌上无牌)：策略化领出连牌或组合，杜绝单一出对子
+            if (!tableTurn) {
+                // 优先出多张连牌，快速消减手牌
+                if (decomposed.straights.length > 0) {
+                    const s = decomposed.straights[0];
+                    return { cards: s.cards, advice: `自由领出：建议起手打【${s.name}】，快速甩牌！` };
+                }
+                if (decomposed.fullHouses.length > 0) {
+                    const fh = decomposed.fullHouses[0];
+                    return { cards: fh.cards, advice: `自由领出：打出【${fh.name}】，清理杂牌对！` };
+                }
+                // 找三同张
+                const rankMap = {};
+                handCards.filter(c => !c.isJoker).forEach(c => rankMap[c.rank] = (rankMap[c.rank] || 0) + 1);
+                for (let r in rankMap) {
+                    if (rankMap[r] === 3) {
+                        const tripletCards = handCards.filter(c => c.rank === r).slice(0, 3);
+                        return { cards: tripletCards, advice: `自由领出：建议打出三张【${r}】` };
+                    }
+                }
+                // 找小对子
+                if (decomposed.pairs.length > 0) {
+                    const p = decomposed.pairs[0];
+                    return { cards: p.cards, advice: `自由领出：建议起手打小对【${p.cards[0].rank}】` };
+                }
+                // 垫小单牌
+                const sortedSingles = [...handCards].sort((a,b) => getCardPower(a, levelRank) - getCardPower(b, levelRank));
+                return { cards: [sortedSingles[0]], advice: `自由领出：建议从最小单牌【${sortedSingles[0].rank}】开始垫牌` };
+            }
+
+            // 2. 队友领跑且牌力强劲时，果断护航过牌
+            if (isTeammateLeading && (tableTurn.pattern.power >= 12 || BOMB_TIERS[tableTurn.pattern.type])) {
+                return { cards: null, advice: `队友领跑且牌面强势 (【${tableTurn.pattern.name}】)，建议果断过牌护航！` };
+            }
+
+            const reqType = tableTurn.pattern.type;
+
+            // 压单张
+            if (reqType === PATTERN_TYPES.SINGLE) {
+                const candidates = handCards
+                    .filter(c => getCardPower(c, levelRank) > tableTurn.pattern.power)
+                    .sort((a,b) => getCardPower(a, levelRank) - getCardPower(b, levelRank));
+                if (candidates.length > 0) {
+                    return { cards: [candidates[0]], advice: `推荐压制：打出单张【${candidates[0].rank}】` };
+                }
+            }
+
+            // 压对子
+            if (reqType === PATTERN_TYPES.PAIR) {
+                for (let i = 0; i < handCards.length; i++) {
+                    for (let j = i + 1; j < handCards.length; j++) {
+                        const pat = analyzePattern([handCards[i], handCards[j]], levelRank);
+                        if (pat && canBeatTable(pat, tableTurn.pattern, levelRank)) {
+                            return { cards: [handCards[i], handCards[j]], advice: `推荐压制：打出对子【${handCards[i].rank}】` };
+                        }
+                    }
+                }
+            }
+
+            // 压三同张
+            if (reqType === PATTERN_TYPES.TRIPLET) {
+                const rankMap = {};
+                handCards.forEach(c => rankMap[c.rank] = (rankMap[c.rank] || 0) + 1);
+                for (let r in rankMap) {
+                    if (rankMap[r] >= 3) {
+                        const trip = handCards.filter(c => c.rank === r).slice(0, 3);
+                        const pat = analyzePattern(trip, levelRank);
+                        if (pat && canBeatTable(pat, tableTurn.pattern, levelRank)) {
+                            return { cards: trip, advice: `推荐压制：打出三张【${r}】` };
+                        }
+                    }
+                }
+            }
+
+            // 压三带二 (Full House)
+            if (reqType === PATTERN_TYPES.FULL_HOUSE) {
+                for (let fh of decomposed.fullHouses) {
+                    const pat = analyzePattern(fh.cards, levelRank);
+                    if (pat && canBeatTable(pat, tableTurn.pattern, levelRank)) {
+                        return { cards: fh.cards, advice: `推荐压制：打出【${fh.name}】` };
+                    }
+                }
+            }
+
+            // 压顺子 (Straight)
+            if (reqType === PATTERN_TYPES.STRAIGHT) {
+                for (let s of decomposed.straights) {
+                    const pat = analyzePattern(s.cards, levelRank);
+                    if (pat && canBeatTable(pat, tableTurn.pattern, levelRank)) {
+                        return { cards: s.cards, advice: `推荐压制：打出【${s.name}】` };
+                    }
+                }
+            }
+
+            // 关键拦截：如果对手出大牌，用炸弹抢回牌权
+            if (!isTeammateLeading) {
+                for (let b of decomposed.bombs) {
+                    const pat = analyzePattern(b.cards, levelRank);
+                    if (pat && canBeatTable(pat, tableTurn.pattern, levelRank)) {
+                        return { cards: b.cards, advice: `关键拦截：打出【${b.name}】夺回主牌权！` };
+                    }
+                }
+            }
+
+            return { cards: null, advice: `暂无划算的压制牌型，建议点击「不出 (过)」` };
+        };
+
+        const IconBase = ({ children, size = 18, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+
+        // 专属赛博全息发光蛋 (Cyber Egg)
+        const CyberEgg = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+                <defs>
+                    <linearGradient id="eggGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#38bdf8" />
+                        <stop offset="60%" stopColor="#818cf8" />
+                        <stop offset="100%" stopColor="#f43f5e" />
+                    </linearGradient>
+                </defs>
+                <path d="M12 2C7.5 2 4 7.2 4 13.5C4 18.2 7.6 22 12 22C16.4 22 20 18.2 20 13.5C20 7.2 16.5 2 12 2Z" 
+                      stroke="url(#eggGrad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M9 14L11.5 11.5L13.5 13.5L16 10" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="7" r="1.5" fill="#f43f5e" />
+            </svg>
+        );
+
+        const Sparkles = p => <IconBase {...p}><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></IconBase>;
+        const HelpCircle = p => <IconBase {...p}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconBase>;
+        const Check = p => <IconBase {...p}><polyline points="20 6 9 17 4 12"/></IconBase>;
+        const XIcon = p => <IconBase {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></IconBase>;
+        const Flame = p => <IconBase {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconBase>;
+        const HomeIcon = p => <IconBase {...p}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></IconBase>;
+        const Lightbulb = p => <IconBase {...p}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></IconBase>;
+        const Trophy = p => <IconBase {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></IconBase>;
+
+        const CardItem = ({ card, levelRank, isSelected, onClick, size = "md", customClass = "", rotation = 0, isDimmed = false }) => {
+            const isWild = isWildCard(card, levelRank);
+            const suitConfig = SUIT_THEMES[card.suit] || SUIT_THEMES.spades;
+
+            const sizeStyles = {
+                xs: "w-8 h-12 text-[10px] rounded-md p-0.5",
+                sm: "w-10 h-15 text-xs rounded-lg p-1",
+                md: "w-16 h-24 sm:w-18 sm:h-26 text-sm rounded-xl p-1.5",
+                lg: "w-20 h-30 sm:w-22 sm:h-34 text-base rounded-2xl p-2"
+            }[size] || "w-16 h-24 text-sm rounded-xl p-1.5";
+
+            return (
+                <div 
+                    onClick={onClick}
+                    style={{ transform: rotation ? `rotate(${rotation}deg)` : undefined }}
+                    className={`cyber-card relative flex flex-col justify-between shrink-0 cursor-pointer select-none ${sizeStyles} ${
+                        isSelected ? 'cyber-card-selected' : ''
+                    } ${isWild ? 'wildcard-glow' : ''} ${
+                        isDimmed ? 'opacity-35 grayscale-[50%] brightness-75 scale-95 border-slate-700/50' : ''
+                    } ${customClass}`}
+                >
+                    <div className="flex justify-between items-start leading-none">
+                        <div className={`font-black font-mono text-sm sm:text-base tracking-tighter ${suitConfig.colorClass} drop-shadow-sm`}>
+                            {card.rank}
+                        </div>
+                        <div className={`text-xs ${suitConfig.colorClass} font-bold`}>
+                            {suitConfig.symbol}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex items-center justify-center my-0.5 pointer-events-none">
+                        {card.isJoker ? (
+                            <div className="flex flex-col items-center">
+                                <span className="text-xl sm:text-2xl font-black">
+                                    {card.jokerType === 'big' ? '👑' : '🃏'}
+                                </span>
+                                <span className={`text-[8px] font-mono tracking-widest font-black ${card.jokerType === 'big' ? 'text-purple-300' : 'text-slate-300'}`}>
+                                    {card.jokerType === 'big' ? '大王' : '小王'}
+                                </span>
+                            </div>
+                        ) : (
+                            <span className={`text-3xl sm:text-4xl font-black ${suitConfig.colorClass} drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]`}>
+                                {suitConfig.symbol}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[9px] leading-none pt-0.5 border-t border-white/10">
+                        {isWild ? (
+                            <span className="font-black text-[8px] text-rose-200 bg-rose-500/40 px-1 py-0.2 rounded font-sans border border-rose-400">
+                                配
+                            </span>
+                        ) : card.rank === levelRank ? (
+                            <span className="font-black text-[8px] text-amber-200 bg-amber-500/30 px-1 py-0.2 rounded font-sans border border-amber-400">
+                                级
+                            </span>
+                        ) : (
+                            <span className="text-[9px] text-slate-400 font-mono font-bold">
+                                {card.rank}
+                            </span>
+                        )}
+                        <span className={`text-[10px] font-bold ${suitConfig.colorClass}`}>
+                            {suitConfig.symbol}
+                        </span>
+                    </div>
+                </div>
+            );
+        };
+
+        // 规整对称的玩家信息面板与可视化手牌背面阵列
+        const OtherPlayerVisualHand = ({ count, isTeammate, isCurrentTurn, playerName, avatar, position = "top" }) => {
+            const cardBackCount = Math.min(27, count);
+            const displayArray = Array.from({ length: cardBackCount });
+            const isVertical = position === "left" || position === "right";
+
+            return (
+                <div className={`flex flex-col items-center transition-all ${isCurrentTurn ? 'scale-105' : ''}`}>
+                    {/* 规范的苹果微晶胶囊铭牌 */}
+                    <div className={`w-28 sm:w-32 py-1.5 px-2 rounded-2xl border flex flex-col items-center gap-0.5 mb-2 transition-all shadow-xl backdrop-blur-md ${
+                        isCurrentTurn 
+                            ? (isTeammate ? 'bg-cyan-500/25 border-cyan-400 ring-2 ring-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-rose-500/25 border-rose-400 ring-2 ring-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.4)]')
+                            : 'bg-slate-900/90 border-white/10'
+                    }`}>
+                        <div className="flex items-center justify-between w-full leading-none">
+                            <span className="text-base sm:text-lg leading-none">{avatar}</span>
+                            <span className="text-xs font-black text-slate-100 truncate max-w-[70px]">{playerName}</span>
+                            <div className={`px-1.5 py-0.5 rounded-full font-mono text-[11px] font-black ${
+                                isTeammate ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'
+                            }`}>
+                                {count}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between w-full text-[9px] font-mono text-slate-400 pt-0.5 border-t border-white/10 leading-none">
+                            <span>{isTeammate ? '蓝队 · 搭档' : (position === 'left' ? '红队 · 西家' : '红队 · 东家')}</span>
+                            {count === 0 ? (
+                                <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 rounded">完赛</span>
+                            ) : (
+                                <span>剩余张</span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 竖排居中扑克牌背 (左/右玩家) 与 横排 (北玩家) */}
+                    {isVertical ? (
+                        <div className="flex flex-col items-center -space-y-6 sm:-space-y-7 max-h-[260px] sm:max-h-[300px] overflow-hidden p-1">
+                            {displayArray.map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="w-12 h-8 sm:w-14 sm:h-9 rounded-md card-back-holo shrink-0 flex items-center justify-between px-2 relative shadow-md"
+                                >
+                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40"></div>
+                                    <div className="w-4 h-0.5 bg-cyan-400/20 rounded"></div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40"></div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex items-center -space-x-4 sm:-space-x-5 max-w-[340px] sm:max-w-[440px] overflow-hidden p-1">
+                            {displayArray.map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="w-6 h-9 sm:w-7 sm:h-11 rounded-md card-back-holo shrink-0 flex items-center justify-center relative shadow-md"
+                                >
+                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40"></div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const HandPlanModal = ({ handCards, levelRank, onSelectGroup, onClose }) => {
+            const plan = useMemo(() => decomposeHandCards(handCards, levelRank), [handCards, levelRank]);
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 safe-top-padding" onClick={onClose}>
+                    <div className="bg-slate-900 border-2 border-cyan-500/50 rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-[0_0_60px_rgba(6,182,212,0.35)] overflow-hidden animate-pop" onClick={e=>e.stopPropagation()}>
+                        <div className="px-6 py-4 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="text-cyan-400" size={22} />
+                                <h2 className="text-lg font-black text-white tracking-wide">可视化手牌组合胜率规划</h2>
+                            </div>
+                            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-full hover:bg-slate-700">
+                                <XIcon size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 text-slate-300">
+                            <div className="bg-cyan-950/40 p-3.5 rounded-2xl border border-cyan-500/30 text-xs flex items-center justify-between">
+                                <span>💡 已对您的 <b>{handCards.length}</b> 张手牌完成推演。点击下方任意<b>可视化牌块</b>即可一键在手牌架中为您选中！</span>
+                                <span className="text-cyan-400 font-mono font-bold">♥ {levelRank} (逢人配)</span>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h3 className="font-bold text-amber-400 flex items-center gap-1.5 text-sm">
+                                    <Flame size={16} /> 炸弹与核心火力 ({plan.bombs.length} 组)
+                                </h3>
+                                {plan.bombs.length === 0 ? (
+                                    <div className="p-3 rounded-xl bg-slate-950/60 text-slate-500 text-xs">手牌中暂无天然纯炸弹，可利用红桃逢人配配炸</div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {plan.bombs.map((b, i) => (
+                                            <div
+                                                key={i}
+                                                onClick={() => { onSelectGroup(b.cards); onClose(); }}
+                                                className="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-750 border border-amber-500/40 flex flex-col gap-2 cursor-pointer active:scale-98 transition-all group shadow-md"
+                                            >
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="font-black text-amber-300">{b.name}</span>
+                                                    <span className="text-[10px] text-slate-400 group-hover:text-cyan-400 font-mono">点击一键选中 ➔</span>
+                                                </div>
+                                                <div className="flex items-center -space-x-3 pt-1">
+                                                    {b.cards.map((c, idx) => (
+                                                        <CardItem key={idx} card={c} levelRank={levelRank} size="xs" />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                <h3 className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">
+                                    <Sparkles size={16} /> 顺子方案 (5张严格连号) ({plan.straights.length} 组)
+                                </h3>
+                                {plan.straights.length === 0 ? (
+                                    <div className="p-3 rounded-xl bg-slate-950/60 text-slate-500 text-xs">手牌中暂无天然5张连号顺子</div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {plan.straights.map((s, i) => (
+                                            <div
+                                                key={i}
+                                                onClick={() => { onSelectGroup(s.cards); onClose(); }}
+                                                className="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-750 border border-cyan-500/40 flex flex-col gap-2 cursor-pointer active:scale-98 transition-all group shadow-md"
+                                            >
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="font-black text-cyan-300">{s.name}</span>
+                                                    <span className="text-[10px] text-slate-400 group-hover:text-cyan-400 font-mono">点击一键选中 ➔</span>
+                                                </div>
+                                                <div className="flex items-center -space-x-3 pt-1">
+                                                    {s.cards.map((c, idx) => (
+                                                        <CardItem key={idx} card={c} levelRank={levelRank} size="xs" />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {plan.fullHouses.length > 0 && (
+                                <div className="space-y-3">
+                                    <h3 className="font-bold text-rose-400 flex items-center gap-1.5 text-sm">
+                                        三带二方案 ({plan.fullHouses.length} 组)
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {plan.fullHouses.map((fh, i) => (
+                                            <div
+                                                key={i}
+                                                onClick={() => { onSelectGroup(fh.cards); onClose(); }}
+                                                className="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-750 border border-rose-500/40 flex flex-col gap-2 cursor-pointer active:scale-98 transition-all group shadow-md"
+                                            >
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="font-black text-rose-300">{fh.name}</span>
+                                                    <span className="text-[10px] text-slate-400 group-hover:text-cyan-400 font-mono">一键选中 ➔</span>
+                                                </div>
+                                                <div className="flex items-center -space-x-3 pt-1">
+                                                    {fh.cards.map((c, idx) => (
+                                                        <CardItem key={idx} card={c} levelRank={levelRank} size="xs" />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                <h3 className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">
+                                    对子与垫牌推荐 ({plan.pairs.length} 组)
+                                </h3>
+                                <div className="flex flex-wrap gap-2.5">
+                                    {plan.pairs.map((p, i) => (
+                                        <div
+                                            key={i}
+                                            onClick={() => { onSelectGroup(p.cards); onClose(); }}
+                                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-emerald-500/40 flex items-center gap-2 cursor-pointer active:scale-95 transition-all shadow"
+                                        >
+                                            <div className="flex -space-x-3">
+                                                {p.cards.map((c, idx) => (
+                                                    <CardItem key={idx} card={c} levelRank={levelRank} size="xs" />
+                                                ))}
+                                            </div>
+                                            <span className="text-xs font-bold text-emerald-300">{p.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-end">
+                            <button onClick={onClose} className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs">
+                                关闭
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const RulesModal = ({ onClose }) => (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 safe-top-padding" onClick={onClose}>
+                <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-pop" onClick={e=>e.stopPropagation()}>
+                    <div className="px-6 py-4 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <CyberEgg size={24} />
+                            <h2 className="text-xl font-black text-white tracking-wide">掼蛋完整竞技升级规则指南</h2>
+                        </div>
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-700/50">
+                            <XIcon size={20} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        <div className="bg-cyan-950/30 p-4 rounded-2xl border border-cyan-500/30 space-y-2">
+                            <h3 className="font-black text-cyan-300 text-base flex items-center gap-1.5">
+                                <Trophy size={18} className="text-cyan-400" /> 1. 2v2 对抗与 2至A 锦标赛晋级规则
+                            </h3>
+                            <p>两副牌共 108 张，四人对局。南 (你) 与 北 (搭档) 为蓝方战队；东与西为红方战队。比赛从打 <b>2</b> 开始，直到冲过 <b>A</b> 级决出总冠军。</p>
+                            <ul className="list-disc list-inside space-y-1.5 text-slate-300 pl-1">
+                                <li><b>双下 (包揽第1、2名)</b>：获胜战队升 <b>3 级</b> (如打2直接跳升到5)！</li>
+                                <li><b>头游 + 三游 (第1、3名)</b>：获胜战队升 <b>2 级</b>。</li>
+                                <li><b>头游 + 末游 (第1、4名)</b>：获胜战队仅升 <b>1 级</b>。</li>
+                                <li><b>换庄机制</b>：若由对方获得头游，则下一局转入对方进攻回合，打对方的队伍级牌！</li>
+                            </ul>
+                        </div>
+
+                        <div className="bg-rose-950/30 p-4 rounded-2xl border border-rose-500/30 space-y-2">
+                            <h3 className="font-black text-rose-400 text-base flex items-center gap-1.5">
+                                <Flame size={18} /> 2. 灵魂核心：逢人配 (万能配牌)
+                            </h3>
+                            <p>当局级牌打几，<b>红桃牌</b>就是万能牌（例如当前级牌打 5，红桃5 即为逢人配）。逢人配可替代除大小王之外的任意牌，组成同花顺、炸弹、钢板、木板等最强牌型！</p>
+                        </div>
+
+                        <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700 space-y-2">
+                            <h3 className="font-black text-amber-300 text-base flex items-center gap-1.5">
+                                <Sparkles size={18} /> 3. 牌型与炸弹天梯排位
+                            </h3>
+                            <p className="font-mono text-amber-200">
+                                👑 四大天王(4王天王炸) &gt; 8张炸 &gt; 7张炸 &gt; 6张炸 &gt; 同花顺(5张) &gt; 5张炸 &gt; 4张炸 &gt; 普通牌型
+                            </p>
+                            <p className="text-slate-400">
+                                普通牌型：单张、对子、三同张、三带二、顺子(严格5张连号)、钢板(二连三如 333444)、三连对(木板如 334455)。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-end">
+                        <button onClick={onClose} className="px-6 py-2.5 bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-black rounded-xl text-xs active:scale-95 transition-all">
+                            我明白了，开始对决
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const HomeSetupScreen = ({ onStartGame, onShowRules }) => {
+            const [selectedChar, setSelectedChar] = useState('judy');
+
+            return (
+                <div className="h-full w-full flex flex-col items-center justify-center p-4 relative overflow-hidden safe-top-padding safe-bottom-padding">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-rose-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+
+                    <div className="relative z-10 flex flex-col items-center mb-6 animate-float text-center">
+                        <div className="p-4 bg-cyan-500/15 rounded-3xl border border-cyan-500/40 mb-3 shadow-[0_0_35px_rgba(34,211,238,0.4)]">
+                            <CyberEgg size={64} />
+                        </div>
+                        <h1 className="text-5xl sm:text-6xl md:text-7xl font-black bg-gradient-to-r from-cyan-300 via-sky-200 to-rose-400 bg-clip-text text-transparent tracking-wider uppercase drop-shadow-2xl">
+                            GUANDAN NEO
+                        </h1>
+                        <div className="h-px w-36 bg-gradient-to-r from-transparent via-cyan-400 to-transparent my-2 opacity-60"></div>
+                        <p className="text-xs sm:text-sm text-slate-400 font-mono tracking-widest uppercase">
+                            iPad Pro 12.9" 2 to A Circuit Championship
+                        </p>
+                    </div>
+
+                    <div className="relative z-20 w-full max-w-md mb-8 space-y-2">
+                        <label className="text-xs text-slate-400 font-bold tracking-widest uppercase block text-center">
+                            请选择您的本命特工角色
+                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => { audio.playTap(); setSelectedChar('judy'); }}
+                                className={`p-4 rounded-3xl border transition-all flex flex-col items-center gap-2 relative ${
+                                    selectedChar === 'judy'
+                                        ? 'bg-cyan-500/20 border-cyan-400 shadow-[0_0_25px_rgba(34,211,238,0.4)] ring-2 ring-cyan-400'
+                                        : 'bg-slate-900/80 border-slate-700 hover:bg-slate-800'
+                                }`}
+                            >
+                                <span className="text-4xl">🐰</span>
+                                <div className="text-center">
+                                    <div className="font-black text-sm text-white">Judy Hopps</div>
+                                    <div className="text-[10px] text-cyan-300">朱迪警官 · 智勇兼备</div>
+                                </div>
+                                {selectedChar === 'judy' && (
+                                    <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={() => { audio.playTap(); setSelectedChar('nick'); }}
+                                className={`p-4 rounded-3xl border transition-all flex flex-col items-center gap-2 relative ${
+                                    selectedChar === 'nick'
+                                        ? 'bg-rose-500/20 border-rose-400 shadow-[0_0_25px_rgba(244,63,94,0.4)] ring-2 ring-rose-400'
+                                        : 'bg-slate-900/80 border-slate-700 hover:bg-slate-800'
+                                }`}
+                            >
+                                <span className="text-4xl">🦊</span>
+                                <div className="text-center">
+                                    <div className="font-black text-sm text-white">Nick Wilde</div>
+                                    <div className="text-[10px] text-rose-300">尼克狐 · 奇谋神算</div>
+                                </div>
+                                {selectedChar === 'nick' && (
+                                    <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]"></span>
+                                )}
+                            </button>
+                        </div>
+                        <div className="text-center text-[11px] text-slate-500 pt-1">
+                            ✦ 开启后系统将自动从动物城群英中随机抽取匹配 3 名性格迥异的搭档与对手
+                        </div>
+                    </div>
+
+                    <div className="relative z-20 flex flex-col sm:flex-row items-center gap-4 w-full max-w-md justify-center">
+                        <button
+                            onClick={() => onStartGame(selectedChar)}
+                            className="w-full sm:w-52 py-3.5 bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-600 text-slate-950 font-black rounded-2xl text-base shadow-[0_0_35px_rgba(34,211,238,0.5)] active:scale-95 transition-all text-center flex items-center justify-center gap-2"
+                        >
+                            <CyberEgg size={20} />
+                            <span>随机匹配开赛</span>
+                        </button>
+                        <button
+                            onClick={onShowRules}
+                            className="w-full sm:w-44 py-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold rounded-2xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            <HelpCircle size={18} />
+                            <span>规则指南</span>
+                        </button>
+                    </div>
+
+                    <div className="absolute bottom-4 text-slate-600 text-xs font-mono">
+                        Designed for iPad Pro 12.9" · 2 to A Circuit
+                    </div>
+                </div>
+            );
+        };
+
+        function GuandanGame() {
+            const [gameState, setGameState] = useState('setup');
+            const [playerChar, setPlayerChar] = useState('judy');
+
+            const [cyanTeamRank, setCyanTeamRank] = useState('2');
+            const [roseTeamRank, setRoseTeamRank] = useState('2');
+            const [currentAttackingTeam, setCurrentAttackingTeam] = useState('cyan');
+            const [levelRank, setLevelRank] = useState('2');
+
+            // 0=南(你), 1=东, 2=北(队友), 3=西
+            const [hands, setHands] = useState({ 0: [], 1: [], 2: [], 3: [] });
+            const [selectedCards, setSelectedCards] = useState([]);
+
+            const [currentTurnPlayer, setCurrentTurnPlayer] = useState(0);
+            const [turnStep, setTurnStep] = useState(0); // 轮次步进计数器
+            const [lastTurnPlay, setLastTurnPlay] = useState(null); // 当前中心高亮最新打出的牌
+            const [scatteredPiles, setScatteredPiles] = useState([]); // 散落在中央矩形四周的历史变暗牌堆
+            const [passCount, setPassCount] = useState(0);
+
+            const [finishOrder, setFinishOrder] = useState([]);
+            const [logs, setLogs] = useState([]);
+            const [showRules, setShowRules] = useState(false);
+            const [showPlanModal, setShowPlanModal] = useState(false);
+            const [gameRoundModal, setGameRoundModal] = useState(null);
+            const [hintMessage, setHintMessage] = useState(null);
+
+            const [playerProfiles, setPlayerProfiles] = useState({});
+
+            const scatterSlotCursor = useRef(0);
+
+            // 实时状态引用总线：彻底消除 setTimeout 闭包读取旧状态引发的卡死
+            const stateRef = useRef({
+                hands,
+                lastTurnPlay,
+                finishOrder,
+                currentTurnPlayer,
+                levelRank,
+                gameState,
+                passCount
+            });
+            useEffect(() => {
+                stateRef.current = {
+                    hands,
+                    lastTurnPlay,
+                    finishOrder,
+                    currentTurnPlayer,
+                    levelRank,
+                    gameState,
+                    passCount
+                };
+            }, [hands, lastTurnPlay, finishOrder, currentTurnPlayer, levelRank, gameState, passCount]);
+
+            const isPlayerTurn = currentTurnPlayer === 0 && !finishOrder.includes(0);
+
+            // 确保选中的卡牌属于南家有效手牌
+            const validSelectedCards = useMemo(() => {
+                if (!hands[0] || hands[0].length === 0) return [];
+                const currentIds = new Set(hands[0].map(c => c.id));
+                return selectedCards.filter(c => currentIds.has(c.id));
+            }, [selectedCards, hands]);
+
+            const currentSelectedPattern = useMemo(() => {
+                if (validSelectedCards.length === 0) return null;
+                return analyzePattern(validSelectedCards, levelRank);
+            }, [validSelectedCards, levelRank]);
+
+            const canPlaySelected = useMemo(() => {
+                if (!isPlayerTurn || !currentSelectedPattern || validSelectedCards.length === 0) return false;
+                return canBeatTable(currentSelectedPattern, lastTurnPlay?.pattern, levelRank);
+            }, [isPlayerTurn, currentSelectedPattern, validSelectedCards, lastTurnPlay, levelRank]);
+
+            const logMessage = (msg) => {
+                setLogs(prev => [msg, ...prev].slice(0, 35));
+            };
+
+            const initTournament = (chosenChar) => {
+                setPlayerChar(chosenChar);
+                const shuffledBots = [...BOT_CANDIDATES].sort(() => 0.5 - Math.random());
+                const northTeammate = chosenChar === 'judy' 
+                    ? { name: '尼克搭档', avatar: '🦊', isTeammate: true }
+                    : { name: '朱迪搭档', avatar: '🐰', isTeammate: true };
+
+                const newProfiles = {
+                    0: chosenChar === 'judy' ? { name: '朱迪 (你)', avatar: '🐰', isTeammate: true } : { name: '尼克 (你)', avatar: '🦊', isTeammate: true },
+                    1: { name: shuffledBots[0].name, avatar: shuffledBots[0].avatar, isTeammate: false },
+                    2: northTeammate,
+                    3: { name: shuffledBots[1].name, avatar: shuffledBots[1].avatar, isTeammate: false }
+                };
+
+                setPlayerProfiles(newProfiles);
+                setCyanTeamRank('2');
+                setRoseTeamRank('2');
+                setCurrentAttackingTeam('cyan');
+                startRound('2', newProfiles, 0, 'cyan');
+            };
+
+            const startRound = (targetLevel, profiles = playerProfiles, starter = 0, attackingTeam = currentAttackingTeam) => {
+                const deck = generateGuandanDeck();
+                const sortHand = arr => [...arr].sort((a,b) => getCardPower(b, targetLevel) - getCardPower(a, targetLevel));
+
+                const newHands = {
+                    0: sortHand(deck.slice(0, 27)),
+                    1: sortHand(deck.slice(27, 54)),
+                    2: sortHand(deck.slice(54, 81)),
+                    3: sortHand(deck.slice(81, 108))
+                };
+
+                setLevelRank(targetLevel);
+                setHands(newHands);
+                setSelectedCards([]);
+                setLastTurnPlay(null);
+                setScatteredPiles([]);
+                setPassCount(0);
+                setFinishOrder([]);
+                setCurrentTurnPlayer(starter);
+                setTurnStep(prev => prev + 1);
+                setGameRoundModal(null);
+                setHintMessage(null);
+                setGameState('playing');
+
+                logMessage(`🎮 锦标赛新回合启航！当前级牌打【${targetLevel}】，红桃${targetLevel}为逢人配！由 ${profiles[starter]?.name} 首领！`);
+            };
+
+            // 自动调度引擎：彻底解决玩家率先打完手牌后卡局的现象
+            useEffect(() => {
+                if (gameState !== 'playing') return;
+
+                const activePlayers = [0, 1, 2, 3].filter(p => !finishOrder.includes(p) && hands[p] && hands[p].length > 0);
+
+                // 1. 若已有 3 人完赛或仅剩 1 名玩家，本局结束并结算
+                if (finishOrder.length >= 3 || activePlayers.length <= 1) {
+                    handleRoundEnd();
+                    return;
+                }
+
+                // 2. 防卡死检测：若轮到的玩家已经出完牌或手牌为0，毫秒级顺延给下一个有效在场玩家
+                if (finishOrder.includes(currentTurnPlayer) || (hands[currentTurnPlayer] && hands[currentTurnPlayer].length === 0)) {
+                    let next = (currentTurnPlayer + 1) % 4;
+                    let safeGuard = 0;
+                    while ((finishOrder.includes(next) || (hands[next] && hands[next].length === 0)) && safeGuard < 4) {
+                        next = (next + 1) % 4;
+                        safeGuard++;
+                    }
+                    if (safeGuard < 4) {
+                        setCurrentTurnPlayer(next);
+                        setTurnStep(prev => prev + 1);
+                    } else {
+                        handleRoundEnd();
+                    }
+                    return;
+                }
+
+                // 3. AI 轮次自动思考执行（包括玩家完赛后队友接风领牌）
+                if (currentTurnPlayer !== 0 && !finishOrder.includes(currentTurnPlayer)) {
+                    const timer = setTimeout(() => {
+                        handleAiTurn(currentTurnPlayer);
+                    }, 650);
+                    return () => clearTimeout(timer);
+                }
+            }, [currentTurnPlayer, turnStep, finishOrder, gameState, hands]);
+
+            const advanceToNextActivePlayer = (fromPlayer, latestFinishOrder = finishOrder, latestHands = hands) => {
+                const activePlayers = [0, 1, 2, 3].filter(p => !latestFinishOrder.includes(p) && latestHands[p] && latestHands[p].length > 0);
+                if (activePlayers.length <= 1) {
+                    handleRoundEnd();
+                    return;
+                }
+                let next = (fromPlayer + 1) % 4;
+                let loops = 0;
+                while ((latestFinishOrder.includes(next) || (latestHands[next] && latestHands[next].length === 0)) && loops < 4) {
+                    next = (next + 1) % 4;
+                    loops++;
+                }
+                if (loops >= 4) {
+                    handleRoundEnd();
+                    return;
+                }
+                setCurrentTurnPlayer(next);
+                setTurnStep(prev => prev + 1);
+            };
+
+            const handleAiTurn = (aiId) => {
+                const currState = stateRef.current;
+                const aiHand = currState.hands[aiId];
+
+                if (!aiHand || aiHand.length === 0 || currState.finishOrder.includes(aiId)) {
+                    advanceToNextActivePlayer(aiId, currState.finishOrder, currState.hands);
+                    return;
+                }
+
+                try {
+                    const activeTablePlay = currState.lastTurnPlay;
+                    const isTeammateLeading = activeTablePlay && (
+                        (aiId === 2 && activeTablePlay.player === 0) ||
+                        (aiId === 1 && activeTablePlay.player === 3) ||
+                        (aiId === 3 && activeTablePlay.player === 1)
+                    );
+
+                    const adviceResult = findSmartAdvice(aiHand, activeTablePlay, currState.levelRank, isTeammateLeading);
+
+                    // 核心铁律：若桌上无牌（领牌权），AI 绝对禁止过牌，必须出牌！
+                    if (!activeTablePlay) {
+                        if (adviceResult && adviceResult.cards && adviceResult.cards.length > 0) {
+                            let pat = analyzePattern(adviceResult.cards, currState.levelRank);
+                            if (pat) {
+                                executePlay(aiId, adviceResult.cards, pat);
+                                return;
+                            }
+                        }
+                        // 兜底起牌：出最小单张，确保绝对不卡死
+                        const fallbackCards = [aiHand[aiHand.length - 1]];
+                        const pat = analyzePattern(fallbackCards, currState.levelRank) || { type: 'SINGLE', power: 1, name: '单张', count: 1 };
+                        executePlay(aiId, fallbackCards, pat);
+                        return;
+                    }
+
+                    // 跟牌模式
+                    if (adviceResult && adviceResult.cards && adviceResult.cards.length > 0) {
+                        let pat = analyzePattern(adviceResult.cards, currState.levelRank);
+                        if (pat && canBeatTable(pat, activeTablePlay.pattern, currState.levelRank)) {
+                            executePlay(aiId, adviceResult.cards, pat);
+                        } else {
+                            executePass(aiId);
+                        }
+                    } else {
+                        executePass(aiId);
+                    }
+                } catch(e) {
+                    // 异常兜底保护
+                    if (!currState.lastTurnPlay && aiHand.length > 0) {
+                        const fallbackCards = [aiHand[aiHand.length - 1]];
+                        const pat = analyzePattern(fallbackCards, currState.levelRank) || { type: 'SINGLE', power: 1, name: '单张', count: 1 };
+                        executePlay(aiId, fallbackCards, pat);
+                    } else {
+                        executePass(aiId);
+                    }
+                }
+            };
+
+            // 生成覆盖全桌的自然扑克散落位（循环使用 28 个独立方位槽，避免大片空白）
+            const generateScatteredPosition = () => {
+                const slotIndex = scatterSlotCursor.current % SCATTER_TABLE_SLOTS.length;
+                scatterSlotCursor.current++;
+                const base = SCATTER_TABLE_SLOTS[slotIndex];
+                
+                // 增加少量自然漂移抖动与随机旋转偏角
+                const jitterX = (Math.random() * 8 - 4).toFixed(1);
+                const jitterY = (Math.random() * 8 - 4).toFixed(1);
+                const jitterRot = (Math.random() * 18 - 9).toFixed(1);
+                return {
+                    left: `${Math.max(5, Math.min(95, parseFloat(base.x) + parseFloat(jitterX)))}%`,
+                    top: `${Math.max(12, Math.min(88, parseFloat(base.y) + parseFloat(jitterY)))}%`,
+                    rotation: parseFloat(base.rot) + parseFloat(jitterRot)
+                };
+            };
+
+            const executePlay = (playerId, cards, pattern) => {
+                if (!cards || cards.length === 0 || !pattern) {
+                    executePass(playerId);
+                    return;
+                }
+
+                audio.playPlayCards();
+                if (pattern.type === PATTERN_TYPES.FOUR_KINGS || BOMB_TIERS[pattern.type]) {
+                    audio.playBomb();
+                }
+
+                if (playerId === 0) {
+                    setSelectedCards([]);
+                    setHintMessage(null);
+                }
+
+                // 扣减手牌
+                const playedIds = new Set(cards.map(c => c.id));
+                const nextHand = hands[playerId].filter(c => !playedIds.has(c.id));
+                const nextHandsState = { ...hands, [playerId]: nextHand };
+                setHands(nextHandsState);
+
+                // 将上一手打出的中央牌移到四周散落堆中，并变暗（保留多达 40 组历史散落牌）
+                if (lastTurnPlay) {
+                    const scatterPos = generateScatteredPosition();
+                    const newScatteredPile = {
+                        id: `scatter_${Date.now()}_${Math.random()}`,
+                        cards: lastTurnPlay.cards,
+                        patternName: lastTurnPlay.pattern.name,
+                        playerName: playerProfiles[lastTurnPlay.player]?.name,
+                        position: scatterPos
+                    };
+                    setScatteredPiles(prev => [...prev.slice(-39), newScatteredPile]);
+                }
+
+                // 中央长方形最新出牌区：为每张牌加上微偏角，保持居中高亮
+                const cardsWithRotation = cards.map(c => ({
+                    ...c,
+                    rotation: (Math.random() * 12 - 6).toFixed(1)
+                }));
+
+                const newTurnPlay = { player: playerId, cards: cardsWithRotation, pattern };
+                setLastTurnPlay(newTurnPlay);
+                setPassCount(0);
+
+                const pName = playerProfiles[playerId]?.name || `玩家${playerId}`;
+                logMessage(`${pName} 打出: ${pattern.name} (${cards.length}张)`);
+
+                // 检查名次完赛
+                let nextFinishOrder = finishOrder;
+                if (nextHand.length === 0 && !finishOrder.includes(playerId)) {
+                    nextFinishOrder = [...finishOrder, playerId];
+                    setFinishOrder(nextFinishOrder);
+                    const rankTitles = ['头游 🥇', '二游 🥈', '三游 🥉'];
+                    const title = rankTitles[nextFinishOrder.length - 1] || '完赛';
+                    logMessage(`🏆 ${pName} 已清空所有手牌，荣膺【${title}】！`);
+                }
+
+                if (nextFinishOrder.length >= 3) {
+                    return;
+                }
+
+                advanceToNextActivePlayer(playerId, nextFinishOrder, nextHandsState);
+            };
+
+            const executePass = (playerId) => {
+                audio.playPass();
+                const pName = playerProfiles[playerId]?.name || `玩家${playerId}`;
+                logMessage(`${pName} 选择了不出 (过)`);
+
+                if (playerId === 0) {
+                    setHintMessage(null);
+                }
+
+                const activePlayersRemaining = [0, 1, 2, 3].filter(p => !finishOrder.includes(p) && hands[p] && hands[p].length > 0);
+                const nextPass = passCount + 1;
+
+                // 若领牌者已完赛（如率先头游），则剩余所有在场玩家均表态过牌才结算
+                const isTrickWinnerActive = lastTurnPlay && activePlayersRemaining.includes(lastTurnPlay.player);
+                const requiredPassCount = isTrickWinnerActive 
+                    ? Math.max(1, activePlayersRemaining.length - 1) 
+                    : Math.max(1, activePlayersRemaining.length);
+
+                // 若其余仍有手牌的玩家全部 Pass，回合结算领牌权
+                if (nextPass >= requiredPassCount) {
+                    const trickWinner = lastTurnPlay ? lastTurnPlay.player : playerId;
+                    let nextLeader = trickWinner;
+
+                    // 掼蛋正规接风规则：若领跑者已打光手牌，由同队搭档接风！若搭档也打完，顺延下家接风
+                    if (hands[trickWinner]?.length === 0 || finishOrder.includes(trickWinner)) {
+                        const teammate = (trickWinner + 2) % 4;
+                        if (hands[teammate]?.length > 0 && !finishOrder.includes(teammate)) {
+                            nextLeader = teammate;
+                            logMessage(`✦ 上轮领牌者已完赛，由同队搭档【接风领牌】！`);
+                        } else {
+                            let cand = (trickWinner + 1) % 4;
+                            while (finishOrder.includes(cand) || !hands[cand] || hands[cand]?.length === 0) {
+                                cand = (cand + 1) % 4;
+                            }
+                            nextLeader = cand;
+                            logMessage(`✦ 搭档双方均已完赛，由下家顺延接风领牌！`);
+                        }
+                    } else {
+                        logMessage(`✦ 全员过牌，由获胜者任意领出新牌！`);
+                    }
+
+                    // 将中央高亮牌移到四周散落堆
+                    if (lastTurnPlay) {
+                        const scatterPos = generateScatteredPosition();
+                        setScatteredPiles(prev => [...prev.slice(-39), {
+                            id: `scatter_${Date.now()}_${Math.random()}`,
+                            cards: lastTurnPlay.cards,
+                            patternName: lastTurnPlay.pattern.name,
+                            playerName: playerProfiles[lastTurnPlay.player]?.name,
+                            position: scatterPos
+                        }]);
+                    }
+
+                    setLastTurnPlay(null);
+                    setPassCount(0);
+                    setCurrentTurnPlayer(nextLeader);
+                    setTurnStep(prev => prev + 1); // 触发步进，彻底避免状态不变卡死
+                } else {
+                    setPassCount(nextPass);
+                    advanceToNextActivePlayer(playerId, finishOrder, hands);
+                }
+            };
+
+            const handleRoundEnd = () => {
+                audio.playFanfare();
+
+                const remainingLoser = [0, 1, 2, 3].find(p => !finishOrder.includes(p));
+                const finalOrder = remainingLoser !== undefined ? [...finishOrder, remainingLoser] : finishOrder;
+
+                const rank1 = finalOrder[0];
+                const rank2 = finalOrder[1];
+                const rank3 = finalOrder[2];
+
+                const isCyanTeam = p => p === 0 || p === 2;
+                const winnerTeam = isCyanTeam(rank1) ? 'cyan' : 'rose';
+
+                let bonus = 1;
+                let desc = '';
+
+                if (isCyanTeam(rank1) && isCyanTeam(rank2)) {
+                    bonus = 3;
+                    desc = '双下 (包揽第1、2名)，连升 3 级！';
+                } else if (!isCyanTeam(rank1) && !isCyanTeam(rank2)) {
+                    bonus = 3;
+                    desc = '双下 (包揽第1、2名)，连升 3 级！';
+                } else if (winnerTeam === 'cyan' && isCyanTeam(rank3)) {
+                    bonus = 2;
+                    desc = '头游 + 三游，晋升 2 级！';
+                } else if (winnerTeam === 'rose' && !isCyanTeam(rank3)) {
+                    bonus = 2;
+                    desc = '头游 + 三游，晋升 2 级！';
+                } else {
+                    bonus = 1;
+                    desc = '头游 + 末游，晋升 1 级！';
+                }
+
+                let nextCyan = cyanTeamRank;
+                let nextRose = roseTeamRank;
+                let hasChampion = false;
+
+                if (winnerTeam === 'cyan') {
+                    const currentIdx = RANKS.indexOf(cyanTeamRank);
+                    const nextIdx = Math.min(RANKS.length - 1, currentIdx + bonus);
+                    nextCyan = RANKS[nextIdx];
+                    setCyanTeamRank(nextCyan);
+                    setCurrentAttackingTeam('cyan');
+                    if (cyanTeamRank === 'A' && bonus >= 2) {
+                        hasChampion = true;
+                    }
+                } else {
+                    const currentIdx = RANKS.indexOf(roseTeamRank);
+                    const nextIdx = Math.min(RANKS.length - 1, currentIdx + bonus);
+                    nextRose = RANKS[nextIdx];
+                    setRoseTeamRank(nextRose);
+                    setCurrentAttackingTeam('rose');
+                    if (roseTeamRank === 'A' && bonus >= 2) {
+                        hasChampion = true;
+                    }
+                }
+
+                const nextPlayingRank = winnerTeam === 'cyan' ? nextCyan : nextRose;
+
+                setGameRoundModal({
+                    winnerTeam,
+                    bonus,
+                    desc,
+                    finalOrder,
+                    nextPlayingRank,
+                    hasChampion
+                });
+            };
+
+            const toggleSelectCard = (card) => {
+                audio.playTap();
+                if (selectedCards.some(c => c.id === card.id)) {
+                    setSelectedCards(selectedCards.filter(c => c.id !== card.id));
+                } else {
+                    setSelectedCards([...selectedCards, card]);
+                }
+            };
+
+            const handleProvideHint = () => {
+                audio.playTap();
+                if (!isPlayerTurn) {
+                    logMessage("当前非您的出牌轮次");
+                    return;
+                }
+
+                const isTeammateLeading = lastTurnPlay && lastTurnPlay.player === 2;
+                const advice = findSmartAdvice(hands[0], lastTurnPlay, levelRank, isTeammateLeading);
+
+                if (advice && advice.cards) {
+                    setSelectedCards(advice.cards);
+                    setHintMessage(advice.advice);
+                    logMessage(`💡 导师建议: ${advice.advice}`);
+                } else {
+                    setSelectedCards([]);
+                    setHintMessage(advice ? advice.advice : "建议本轮过牌");
+                    logMessage(`💡 导师建议: ${advice ? advice.advice : '建议过牌'}`);
+                }
+            };
+
+            if (gameState === 'setup') {
+                return (
+                    <>
+                        <HomeSetupScreen
+                            onStartGame={(char) => initTournament(char)}
+                            onShowRules={() => setShowRules(true)}
+                        />
+                        {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+                    </>
+                );
+            }
+
+            return (
+                <div className="h-full w-full flex flex-col justify-between overflow-hidden relative safe-top-padding safe-bottom-padding font-sans">
+                    {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+                    {showPlanModal && (
+                        <HandPlanModal
+                            handCards={hands[0]}
+                            levelRank={levelRank}
+                            onSelectGroup={(cards) => setSelectedCards(cards)}
+                            onClose={() => setShowPlanModal(false)}
+                        />
+                    )}
+
+                    {/* 顶部苹果微晶玻璃导航栏与天梯赛况 */}
+                    <div className="h-14 px-3 sm:px-6 flex items-center justify-between z-40 border-b border-white/10 bg-slate-900/80 backdrop-blur-xl shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="p-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-400">
+                                <CyberEgg size={22} />
+                            </div>
+                            <div>
+                                <h1 className="text-sm sm:text-base font-black tracking-wider uppercase bg-gradient-to-r from-cyan-400 via-sky-300 to-rose-400 bg-clip-text text-transparent leading-none">
+                                    GUANDAN // 掼蛋
+                                </h1>
+                                <p className="text-[9px] text-slate-400 font-mono tracking-widest leading-none mt-1">
+                                    iPad Pro 12.9" 锦标赛
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* 队伍天梯等级体系 (从2打到A追踪) */}
+                        <div className="flex items-center gap-2 sm:gap-4 bg-slate-950/80 border border-white/10 px-3 sm:px-4 py-1.5 rounded-2xl shadow-inner">
+                            <div className="flex items-center gap-1.5 text-xs font-mono">
+                                <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+                                <span className="text-cyan-300 font-bold">蓝队 (你/北):</span>
+                                <span className="font-black text-cyan-400 text-sm bg-cyan-950/80 px-1.5 py-0.2 rounded border border-cyan-500/40">
+                                    {cyanTeamRank}
+                                </span>
+                            </div>
+
+                            <span className="text-slate-600 font-bold">VS</span>
+
+                            <div className="flex items-center gap-1.5 text-xs font-mono">
+                                <span className="text-rose-300 font-bold">红队 (东/西):</span>
+                                <span className="font-black text-rose-400 text-sm bg-rose-950/80 px-1.5 py-0.2 rounded border border-rose-500/40">
+                                    {roseTeamRank}
+                                </span>
+                                <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]"></span>
+                            </div>
+
+                            <div className="h-3.5 w-px bg-white/15"></div>
+
+                            <div className="flex items-center gap-1 text-xs">
+                                <span className="text-[10px] text-slate-400">当局级牌:</span>
+                                <span className="text-rose-400 font-black font-mono flex items-center">
+                                    ♥ {levelRank}
+                                    <span className="text-[8px] text-rose-300 ml-1 border border-rose-500/50 px-1 rounded bg-rose-950/60">配</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* 顶栏快捷操作按键 */}
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => setShowPlanModal(true)}
+                                className="px-2.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
+                                title="查看手牌可视化拆解方案"
+                            >
+                                <Sparkles size={14} />
+                                <span>组合规划</span>
+                            </button>
+                            <button onClick={() => setShowRules(true)} className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95">
+                                <HelpCircle size={17} />
+                            </button>
+                            <button onClick={() => setGameState('setup')} className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95" title="返回主页">
+                                <HomeIcon size={17} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 超大牌桌竞技区 (覆盖西至东、北至南的巨大区域，四围散落历史暗牌，中心长方形高亮最新牌) */}
+                    <div className="flex-1 relative flex flex-col justify-between p-2 sm:p-4 overflow-hidden min-h-0">
+                        {/* 顶部：北 (搭档) */}
+                        <div className="flex justify-center z-30">
+                            <OtherPlayerVisualHand
+                                count={hands[2]?.length || 0}
+                                isTeammate={true}
+                                isCurrentTurn={currentTurnPlayer === 2}
+                                playerName={playerProfiles[2]?.name || '搭档'}
+                                avatar={playerProfiles[2]?.avatar || '🐰'}
+                                position="top"
+                            />
+                        </div>
+
+                        {/* 中间核心层：西家 (左) + 广袤大牌桌 (中央) + 东家 (右) */}
+                        <div className="flex-1 flex items-center justify-between px-1 sm:px-3 relative min-h-0">
+                            {/* 西家对手：规整垂直排版 */}
+                            <div className="z-30 w-32 flex justify-center shrink-0">
+                                <OtherPlayerVisualHand
+                                    count={hands[3]?.length || 0}
+                                    isTeammate={false}
+                                    isCurrentTurn={currentTurnPlayer === 3}
+                                    playerName={playerProfiles[3]?.name || '西家'}
+                                    avatar={playerProfiles[3]?.avatar || '🦥'}
+                                    position="left"
+                                />
+                            </div>
+
+                            {/* 广袤大牌桌核心区域 (占据整个屏幕中央大视界) */}
+                            <div className="flex-1 h-full mx-2 sm:mx-4 rounded-3xl border border-white/10 bg-slate-950/40 backdrop-blur-sm relative overflow-hidden flex items-center justify-center shadow-[inset_0_0_80px_rgba(0,0,0,0.8)]">
+                                
+                                {/* 1. 四周自由散落的历史变暗牌堆 (模拟激战后四散交叠在桌面的真实扑克牌) */}
+                                {scatteredPiles.map(pile => (
+                                    <div
+                                        key={pile.id}
+                                        style={{
+                                            position: 'absolute',
+                                            left: pile.position.left,
+                                            top: pile.position.top,
+                                            transform: `translate(-50%, -50%) rotate(${pile.position.rotation}deg)`,
+                                            pointerEvents: 'none'
+                                        }}
+                                        className="flex items-center -space-x-7 z-10 transition-all duration-700 animate-pop"
+                                    >
+                                        {pile.cards.map((c, idx) => (
+                                            <CardItem
+                                                key={c.id || idx}
+                                                card={c}
+                                                levelRank={levelRank}
+                                                size="sm"
+                                                isDimmed={true}
+                                                rotation={c.rotation}
+                                            />
+                                        ))}
+                                    </div>
+                                ))}
+
+                                {/* 2. 正中心长方形最新出牌区 (无论周围有多少散落牌，最中间长方形区域永远是最新高亮牌) */}
+                                <div className="w-[340px] sm:w-[480px] md:w-[540px] h-48 sm:h-54 rounded-3xl border-2 border-cyan-400/40 bg-slate-900/90 backdrop-blur-xl flex flex-col items-center justify-center p-3 relative z-20 shadow-[0_0_40px_rgba(6,182,212,0.25)]">
+                                    {lastTurnPlay ? (
+                                        <div className="flex flex-col items-center gap-2 animate-pop">
+                                            {/* 最新出牌提示铭牌 */}
+                                            <div className="text-xs font-mono font-bold text-cyan-300 flex items-center gap-2 bg-slate-950/90 px-4 py-1 rounded-full border border-cyan-500/40 shadow-xl">
+                                                <Sparkles size={13} className="text-cyan-400" />
+                                                <span>
+                                                    {lastTurnPlay.player === 0 ? '你 (南)' : (lastTurnPlay.player === 2 ? '北 (搭档)' : playerProfiles[lastTurnPlay.player]?.name)} 打出：
+                                                </span>
+                                                <span className="text-amber-300 font-black">{lastTurnPlay.pattern.name}</span>
+                                            </div>
+
+                                            {/* 最新打出的牌：高亮展开 */}
+                                            <div className="flex items-center -space-x-5 sm:-space-x-7 pt-2">
+                                                {lastTurnPlay.cards.map((c, i) => (
+                                                    <CardItem 
+                                                        key={c.id || i} 
+                                                        card={c} 
+                                                        levelRank={levelRank} 
+                                                        size="md" 
+                                                        rotation={c.rotation}
+                                                        isDimmed={false}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-slate-500 space-y-1.5 pointer-events-none">
+                                            <div className="text-3xl opacity-30">♠ ♥ ♣ ♦</div>
+                                            <p className="text-xs font-mono tracking-widest text-slate-400">牌桌自由对决就绪 · 自由领出任意牌型</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 东家对手：规整垂直排版 */}
+                            <div className="z-30 w-32 flex justify-center shrink-0">
+                                <OtherPlayerVisualHand
+                                    count={hands[1]?.length || 0}
+                                    isTeammate={false}
+                                    isCurrentTurn={currentTurnPlayer === 1}
+                                    playerName={playerProfiles[1]?.name || '东家'}
+                                    avatar={playerProfiles[1]?.avatar || '🐃'}
+                                    position="right"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 导师动态建议条 / 战报通知 */}
+                        <div className="self-center z-30 flex flex-col items-center gap-1">
+                            {hintMessage && (
+                                <div className="bg-amber-950/95 border border-amber-500/70 px-4 py-1 rounded-full text-xs font-bold text-amber-200 shadow-xl animate-pop flex items-center gap-1.5">
+                                    <Lightbulb size={14} className="text-amber-400" />
+                                    <span>{hintMessage}</span>
+                                </div>
+                            )}
+                            {logs.length > 0 && !hintMessage && (
+                                <div className="bg-slate-900/85 border border-white/10 px-4 py-1 rounded-full text-xs font-mono text-slate-300 max-w-lg truncate shadow-lg">
+                                    💬 {logs[0]}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 底部玩家手牌架 (预留充足抬升边距，彻底解决选中牌升起被遮挡) */}
+                    <div className="h-68 sm:h-76 bg-slate-950/95 border-t border-white/10 backdrop-blur-2xl flex flex-col p-2.5 z-40 shrink-0">
+                        {/* 手牌架辅助信息栏 */}
+                        <div className="flex items-center justify-between mb-1.5 px-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-cyan-400 flex items-center gap-1.5 font-mono">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                    {playerProfiles[0]?.avatar} {playerProfiles[0]?.name} ({hands[0]?.length || 0} 张)
+                                </span>
+                                {currentSelectedPattern && (
+                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/50">
+                                        已选中: {currentSelectedPattern.name}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={handleProvideHint}
+                                    disabled={!isPlayerTurn}
+                                    className="px-3 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 border border-yellow-300 rounded-xl text-xs font-black transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1 shadow"
+                                >
+                                    <Lightbulb size={13} />
+                                    <span>💡 建议出牌</span>
+                                </button>
+                                <button
+                                    onClick={() => setShowPlanModal(true)}
+                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                >
+                                    ⚡ 组合规划
+                                </button>
+                                <button
+                                    onClick={() => { setSelectedCards([]); setHintMessage(null); }}
+                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-400 rounded-xl text-xs transition-all active:scale-95"
+                                >
+                                    清空选择
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 流体手牌架：顶部留有充足边距 (pt-7)，选中的牌升起 translateY(-24px) 时完全露头 */}
+                        <div className="flex-1 overflow-x-auto custom-scrollbar flex items-center px-4 -space-x-5 sm:-space-x-7 pt-7 pb-2">
+                            {hands[0]?.map(card => (
+                                <CardItem
+                                    key={card.id}
+                                    card={card}
+                                    levelRank={levelRank}
+                                    isSelected={validSelectedCards.some(c => c.id === card.id)}
+                                    onClick={() => toggleSelectCard(card)}
+                                    size="md"
+                                />
+                            ))}
+                            {hands[0]?.length === 0 && (
+                                <div className="w-full text-center text-emerald-400 font-bold text-sm py-8 flex flex-col items-center gap-2">
+                                    <Trophy size={32} className="text-amber-400 animate-bounce" />
+                                    <span className="text-base font-black">🎉 您已率先清空所有手牌完赛！</span>
+                                    <span className="text-xs text-slate-400">正在观战队友与对手竞逐后续名次，请稍候对局自动结算...</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 玩家出牌与过牌控制主按钮 */}
+                        <div className="flex items-center justify-center gap-4 pt-1.5">
+                            <button
+                                onClick={() => executePass(0)}
+                                disabled={!isPlayerTurn || !lastTurnPlay}
+                                className={`px-8 py-2.5 rounded-2xl font-black text-sm border transition-all ${
+                                    isPlayerTurn && lastTurnPlay
+                                        ? 'bg-slate-800 hover:bg-slate-750 text-slate-200 border-slate-600 active:scale-95 shadow-lg'
+                                        : 'bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed'
+                                }`}
+                            >
+                                不出 (过)
+                            </button>
+
+                            <button
+                                onClick={() => executePlay(0, validSelectedCards, currentSelectedPattern)}
+                                disabled={!canPlaySelected}
+                                className={`px-12 py-2.5 rounded-2xl font-black text-sm transition-all shadow-xl flex items-center gap-2 ${
+                                    canPlaySelected
+                                        ? 'bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-slate-950 active:scale-95 shadow-cyan-500/25'
+                                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                }`}
+                            >
+                                <Check size={16} />
+                                <span>确认出牌 ({validSelectedCards.length})</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 回合与总决赛天梯结算弹窗 */}
+                    {gameRoundModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg p-4 safe-top-padding">
+                            <div className="bg-slate-900 border-2 border-cyan-400 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-[0_0_80px_rgba(34,211,238,0.4)] animate-pop space-y-4">
+                                <div className="text-5xl">{gameRoundModal.hasChampion ? '👑' : '🏆'}</div>
+                                <h2 className="text-2xl font-black text-white">
+                                    {gameRoundModal.hasChampion ? '锦标赛登顶总冠军！' : '本局对抗赛结算'}
+                                </h2>
+
+                                <p className={`font-black text-lg ${gameRoundModal.winnerTeam === 'cyan' ? 'text-cyan-400' : 'text-rose-400'}`}>
+                                    {gameRoundModal.winnerTeam === 'cyan' ? '蓝方战队 (你与搭档)' : '红方战队 (对手战队)'} 斩获本局胜利！
+                                </p>
+
+                                <div className="bg-slate-950 p-4 rounded-2xl border border-white/10 text-xs text-slate-300 space-y-2 font-mono">
+                                    <div className="text-amber-300 font-bold">{gameRoundModal.desc}</div>
+                                    <div className="flex justify-around items-center pt-1 border-t border-white/10">
+                                        <div>蓝队级别: <b className="text-cyan-400">{cyanTeamRank}</b></div>
+                                        <div>红队级别: <b className="text-rose-400">{roseTeamRank}</b></div>
+                                    </div>
+                                    <div className="text-[11px] text-slate-400">
+                                        下一局级牌:【<b className="text-amber-400 font-bold">{gameRoundModal.nextPlayingRank}</b>】
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => startRound(gameRoundModal.nextPlayingRank, playerProfiles, gameRoundModal.finalOrder[0], gameRoundModal.winnerTeam)}
+                                    className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-black rounded-2xl text-base shadow-xl active:scale-95 transition-all"
+                                >
+                                    开启下一局
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GuandanGame />);
+    </script>
+</body>
+</html>
